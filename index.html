@@ -1,0 +1,360 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Custom Flappy Bird</title>
+  <style>
+    * {
+      margin: 0; padding: 0; box-sizing: border-box;
+    }
+    body {
+      display: flex; justify-content: center; align-items: center;
+      height: 100vh; background: #000; flex-direction: column;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      user-select: none;
+    }
+    canvas {
+      border: 2px solid gold;
+      border-radius: 10px;
+      max-width: 100%;
+      height: auto;
+      background: #70c5ce;
+      display: block;
+    }
+    #startBtn {
+      position: absolute;
+      background: gold;
+      color: #111;
+      font-size: 22px;
+      padding: 10px 25px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      transition: transform 0.2s;
+      top: 40%;
+      user-select: none;
+    }
+    #startBtn:hover {
+      transform: scale(1.05);
+    }
+    #overlay {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      text-align: center;
+      padding: 20px;
+      user-select: none;
+    }
+    h1 {
+      font-size: 40px;
+      margin-bottom: 18px;
+      text-shadow: 3px 3px 12px #000;
+    }
+    #instruction {
+      font-size: 18px;
+      margin-bottom: 36px;
+      text-shadow: 1px 1px 5px #000;
+    }
+    #soundToggle {
+      position: absolute;
+      right: 15px;
+      top: 15px;
+      padding: 8px 14px;
+      font-size: 16px;
+      background: gold;
+      color: #111;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      user-select: none;
+    }
+    #soundToggle:hover {
+      background: #ffec7a;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="overlay">
+    <h1>Vinay Bird</h1>
+    <div id="instruction">Press Space or Tap to Flap</div>
+    <button id="startBtn">Start Vinay's Game
+
+    </button>
+  </div>
+
+  <button id="soundToggle" title="Toggle Sound">🔊 On</button>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    const startBtn = document.getElementById('startBtn');
+    const soundToggle = document.getElementById('soundToggle');
+
+    canvas.width = 400;
+    canvas.height = 600;
+
+    // Load images
+    const birdImg = new Image();
+    birdImg.src = 'VINAY.jpeg';
+    const pipeImg = new Image();
+    pipeImg.src = 'APPORVA.jpeg';
+    const bgImg = new Image();
+    bgImg.src = 'MV SCHOOL.jpeg';
+
+    // Sounds
+    const bgMusic = new Audio('modi1.mp4');
+    bgMusic.loop = true;
+    const gameOverSounds = [
+      new Audio('modi2.mp4'),
+      new Audio('modi3.mp4')
+    ];
+
+    let soundEnabled = true;
+    soundToggle.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      if (!soundEnabled) {
+        bgMusic.pause();
+        soundToggle.textContent = '🔇 Off';
+      } else {
+        if (gameStarted && !gameOver) bgMusic.play();
+        soundToggle.textContent = '🔊 On';
+      }
+    });
+
+    // Bird and Game State
+    let bird;
+    let pipes;
+    let frame;
+    let score;
+    let gameOver = false;
+    let gameStarted = false;
+    let growing = false; // death animation
+    let pipeSpeed = 2;
+    const pipeGap = 140;
+
+    // Particles for score effect
+    let particles = [];
+
+    function resetGame() {
+      bird = {
+        x: 50,
+        y: 200,
+        width: 40,
+        height: 30,
+        gravity: 0.5,
+        lift: -8,
+        velocity: 0,
+        frame: 0,
+        flapCycle: 0
+      };
+      pipes = [];
+      frame = 0;
+      score = 0;
+      gameOver = false;
+      growing = false;
+      pipeSpeed = 2;
+      particles = [];
+      soundToggle.textContent = soundEnabled ? '🔊 On' : '🔇 Off';
+    }
+
+    function startGame() {
+      overlay.style.display = 'none';
+      gameStarted = true;
+      resetGame();
+      if(soundEnabled) bgMusic.play();
+      draw();
+    }
+
+    startBtn.addEventListener('click', startGame);
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space' && gameStarted && !gameOver) {
+        e.preventDefault();
+        flap();
+      }
+    });
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      if (gameStarted && !gameOver) flap();
+    }, {passive: false});
+
+    function flap() {
+      bird.velocity = bird.lift;
+      bird.flapCycle = 5; // frames of wing flap
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Background
+      if (bgImg.complete && bgImg.naturalHeight !== 0) {
+        ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.fillStyle = '#70c5ce';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      if (!gameOver) {
+        bird.velocity += bird.gravity;
+        bird.y += bird.velocity;
+      }
+
+      if (bird.y + bird.height > canvas.height) {
+        bird.y = canvas.height - bird.height;
+        endGame();
+      }
+      if (bird.y < 0) bird.y = 0;
+
+      // Pipe generation
+      if (frame % 100 === 0 && !gameOver) {
+        const topHeight = Math.random() * 200 + 50;
+        pipes.push({ x: canvas.width, top: topHeight, bottom: topHeight + pipeGap });
+      }
+
+      // Increase pipe speed as score increases for challenge
+      pipeSpeed = 2 + score * 0.1;
+
+      // Draw pipes
+      const scaledWidth = 60;
+      const scaledHeight = 300;
+
+      pipes.forEach((pipe, i) => {
+        pipe.x -= pipeSpeed;
+
+        // Draw top pipe
+        ctx.drawImage(pipeImg, pipe.x, pipe.top - scaledHeight, scaledWidth, scaledHeight);
+
+        // Draw bottom pipe
+        ctx.drawImage(pipeImg, pipe.x, pipe.bottom, scaledWidth, scaledHeight);
+
+        // Collision
+        if (bird.x < pipe.x + scaledWidth &&
+          bird.x + bird.width > pipe.x &&
+          (bird.y < pipe.top || bird.y + bird.height > pipe.bottom)
+        ) {
+          if (!gameOver) endGame();
+        }
+
+        // Remove offscreen pipes
+        if (pipe.x + scaledWidth < 0) {
+          pipes.splice(i, 1);
+          if (!gameOver) {
+            score++;
+            createParticles(bird.x + bird.width, bird.y + bird.height / 2);
+          }
+        }
+      });
+
+      // Update and draw particles
+      particles.forEach((p, index) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.05;
+        ctx.fillStyle = `rgba(255, 215, 0, ${p.life})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        if (p.life <= 0) particles.splice(index, 1);
+      });
+
+      // Bird wing animation (simple frame toggle)
+      if (bird.flapCycle > 0) {
+        bird.flapCycle--;
+      }
+      const birdDrawHeight = bird.flapCycle > 2 ? bird.height + 6 : bird.height;
+
+      // Bird rotation based on velocity (limits for smooth)
+      let angle = bird.velocity * 0.07;
+      angle = Math.min(Math.max(angle, -0.5), 1);
+
+      ctx.save();
+      ctx.translate(bird.x + bird.width / 2, bird.y + bird.height / 2);
+      ctx.rotate(angle);
+
+      if (birdImg.complete && birdImg.naturalHeight !== 0) {
+        ctx.drawImage(birdImg, -bird.width / 2, -birdDrawHeight / 2, bird.width, birdDrawHeight);
+      } else {
+        ctx.fillStyle = 'yellow';
+        ctx.fillRect(-bird.width / 2, -birdDrawHeight / 2, bird.width, birdDrawHeight);
+      }
+      ctx.restore();
+
+      // Score
+      ctx.fillStyle = '#111';
+      ctx.font = '28px Arial Black, Arial';
+      ctx.shadowColor = 'gold';
+      ctx.shadowBlur = 5;
+      ctx.fillText('Score: ' + score, 15, 40);
+      ctx.shadowBlur = 0;
+
+      // Death animation: bird grows bigger
+      if (growing) {
+        bird.width += 1.5;
+        bird.height += 1.5;
+        bird.x -= 0.75;
+        bird.y -= 0.75;
+        if (bird.width > 120) growing = false;
+      }
+
+      if (!gameOver) {
+        frame++;
+        requestAnimationFrame(draw);
+      } else if (growing) {
+        requestAnimationFrame(draw);
+      }
+    }
+
+    function endGame() {
+      if (!gameOver) {
+        gameOver = true;
+        if(soundEnabled) bgMusic.pause();
+
+        const randomSound = gameOverSounds[Math.floor(Math.random() * gameOverSounds.length)];
+        if(soundEnabled) randomSound.play();
+
+        growing = true;
+
+        setTimeout(() => {
+          overlay.style.display = 'flex';
+          startBtn.textContent = 'Restart';
+          document.querySelector('h1').textContent = `Vinay Sir ki Life khatam dosto ! Score: ${score}`;
+          document.getElementById('instruction').textContent = 'Press Start to Play Again';
+        }, 3000);
+      }
+    }
+
+    function createParticles(x, y) {
+      const count = 10;
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: x,
+          y: y,
+          vx: (Math.random() - 0.5) * 3,
+          vy: (Math.random() - 0.5) * 3,
+          life: 1
+        });
+      }
+    }
+
+    // Initialize overlay and instructions
+    overlay.style.display = 'flex';
+  </script>
+</body>
+</html>
+
